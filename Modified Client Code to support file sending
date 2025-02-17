@@ -1,0 +1,97 @@
+import java.io.*;
+import java.net.*;
+import java.util.*;
+
+public class ChatClient {
+    private static final String SERVER_ADDRESS = "localhost";
+    private static final int SERVER_PORT = 12345;
+    private static PrintWriter out;
+    private static BufferedReader in;
+
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT)) {
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            out = new PrintWriter(socket.getOutputStream(), true);
+
+            String welcomeMessage = in.readLine();
+            System.out.println(welcomeMessage);
+
+            new ServerListener().start();
+
+            while (true) {
+                System.out.print("Enter message or 'file' to send a file: ");
+                String input = scanner.nextLine();
+
+                if (input.equalsIgnoreCase("file")) {
+                    System.out.print("Enter the file path: ");
+                    String filePath = scanner.nextLine();
+                    sendFile(filePath);
+                } else {
+                    out.println(input);
+                }
+
+                if (input.equalsIgnoreCase("exit")) {
+                    break;
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void sendFile(String filePath) {
+        try {
+            File file = new File(filePath);
+            if (file.exists() && !file.isDirectory()) {
+                out.println("FILE_TRANSFER " + file.getName());
+                FileInputStream fileIn = new FileInputStream(file);
+                BufferedOutputStream fileOut = new BufferedOutputStream(out);
+                byte[] buffer = new byte[4096];
+                int bytesRead;
+                while ((bytesRead = fileIn.read(buffer)) != -1) {
+                    fileOut.write(buffer, 0, bytesRead);
+                }
+                fileIn.close();
+                fileOut.close();
+                System.out.println("File sent successfully.");
+            } else {
+                System.out.println("File not found.");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static class ServerListener extends Thread {
+        public void run() {
+            try {
+                String message;
+                while ((message = in.readLine()) != null) {
+                    if (message.startsWith("FILE_TRANSFER")) {
+                        receiveFile(message);
+                    } else {
+                        System.out.println(message);
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        private void receiveFile(String message) throws IOException {
+            String fileName = message.split(" ")[1];
+            System.out.println("Receiving file: " + fileName);
+            FileOutputStream fileOut = new FileOutputStream(fileName);
+            BufferedInputStream fileIn = new BufferedInputStream(in);
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = fileIn.read(buffer)) != -1) {
+                fileOut.write(buffer, 0, bytesRead);
+            }
+            fileIn.close();
+            fileOut.close();
+            System.out.println("File received successfully.");
+        }
+    }
+}
