@@ -1,0 +1,51 @@
+private static class ClientHandler extends Thread {
+    private Socket socket;
+    private PrintWriter out;
+    private BufferedReader in;
+
+    public ClientHandler(Socket socket) {
+        this.socket = socket;
+    }
+
+    public void run() {
+        try {
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            out = new PrintWriter(socket.getOutputStream(), true);
+
+            String clientName = in.readLine();
+            synchronized (clientWriters) {
+                clientWriters.add(out);
+            }
+
+            String message;
+            while ((message = in.readLine()) != null) {
+                if (message.startsWith("FILE_TRANSFER")) {
+                    receiveFile();
+                } else {
+                    System.out.println(clientName + ": " + message);
+                    broadcastMessage(clientName + ": " + message);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                socket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private void receiveFile() throws IOException {
+        // Logic to receive and save the file
+    }
+
+    private void broadcastMessage(String message) {
+        synchronized (clientWriters) {
+            for (PrintWriter writer : clientWriters) {
+                writer.println(message);
+            }
+        }
+    }
+}
